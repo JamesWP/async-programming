@@ -11,3 +11,7 @@ set_target_properties(single_threaded PROPERTIES CXX_STANDARD 17)
 add_executable(multi_threaded multi_threaded.cpp)
 target_link_libraries(multi_threaded PRIVATE CURL::libcurl unofficial::libuv::libuv)
 set_target_properties(multi_threaded PROPERTIES CXX_STANDARD 17)
+
+add_executable(curl_libuv_example curl_libuv_example.cpp)
+target_link_libraries(curl_libuv_example PRIVATE CURL::libcurl unofficial::libuv::libuv)
+set_target_properties(curl_libuv_example PROPERTIES CXX_STANDARD 17)
