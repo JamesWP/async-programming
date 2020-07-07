@@ -12,6 +12,11 @@ void single_thread(std::string_view url);
 
 int main(int argc, char* argv[])
 {
+  if(curl_global_init(CURL_GLOBAL_ALL)) {
+    std::cerr << "Could not init curl\n";
+    return 1;
+  }
+
   std::string response;
   std::string url = argc < 2 ? "https://example.com": argv[1];
 
