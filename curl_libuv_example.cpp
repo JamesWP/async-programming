@@ -7,6 +7,8 @@
 #include <string_view>
 #include <iostream>
 #include <array>
+#include <functional>
+#include <iomanip>
 
 constexpr const int NUM_REQUESTS = 10;
 
@@ -51,13 +53,26 @@ size_t write_callback(char *ptr, size_t size, size_t count, void *userdata) {
   return count;
 }
 
-static void add_download(const char *url, std::string& response)
+struct continuation_context {
+  using cb = std::function<void(const std::string&)>;
+
+  cb          callback;
+  std::string response;
+};
+
+static void add_download(const char *url,  continuation_context::cb callback)
 {
   CURL *handle;
 
+  std::cout << "Requesting: " << std::quoted(url) << "\n";
+
+  continuation_context *ctx = new continuation_context();
+  ctx->callback = callback;
+
   handle = curl_easy_init();
   curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_callback);
-  curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, &ctx->response);
+  curl_easy_setopt(handle, CURLOPT_PRIVATE, ctx);
   curl_easy_setopt(handle, CURLOPT_URL, url);
   curl_multi_add_handle(curl_handle, handle);
 }
@@ -68,7 +83,6 @@ static void check_multi_info(void)
   CURLMsg *message;
   int pending;
   CURL *easy_handle;
-  FILE *file;
 
   while((message = curl_multi_info_read(curl_handle, &pending))) {
     switch(message->msg) {
@@ -81,14 +95,14 @@ static void check_multi_info(void)
       easy_handle = message->easy_handle;
 
       curl_easy_getinfo(easy_handle, CURLINFO_EFFECTIVE_URL, &done_url);
-      curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &file);
-      printf("%s DONE\n", done_url);
+      continuation_context *ctx;
+      curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &ctx);
+
+      ctx->callback(ctx->response);
+      delete ctx;
 
       curl_multi_remove_handle(curl_handle, easy_handle);
       curl_easy_cleanup(easy_handle);
-      if(file) {
-        fclose(file);
-      }
       break;
 
     default:
@@ -197,18 +211,14 @@ int main(int argc, char **argv)
   curl_multi_setopt(curl_handle, CURLMOPT_SOCKETFUNCTION, handle_socket);
   curl_multi_setopt(curl_handle, CURLMOPT_TIMERFUNCTION, start_timeout);
 
-  std::array<std::string, NUM_REQUESTS> response;
-
   for(int i = 0; i < NUM_REQUESTS; i++) {
-    add_download(url.c_str(), response[i]);
+    add_download(url.c_str(), [](const std::string& response){
+      std::cout << "Response lines: " << count_lines(response) << "\n";
+    });
   }
 
   uv_run(loop, UV_RUN_DEFAULT);
   curl_multi_cleanup(curl_handle);
-
-  for(int i = 0; i < NUM_REQUESTS; i++) {
-    std::cout << "Response lines: " << count_lines(response[i]) << "\n";
-  }
 
   return 0;
 }
