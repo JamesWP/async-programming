@@ -9,7 +9,7 @@
 #include <array>
 #include <algorithm>
 
-constexpr const int NUM_REQUESTS = 10;
+constexpr const int NUM_REQUESTS = 100;
 
 // Perform HTTP get syncronously
 void single_thread(void* arg);

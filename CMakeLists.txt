@@ -12,6 +12,7 @@ add_executable(multi_threaded multi_threaded.cpp)
 target_link_libraries(multi_threaded PRIVATE CURL::libcurl unofficial::libuv::libuv)
 set_target_properties(multi_threaded PROPERTIES CXX_STANDARD 17)
 
-add_executable(curl_libuv_example curl_libuv_example.cpp)
+add_executable(curl_libuv_example curl_libuv_example.cpp curl_libuv.cpp)
 target_link_libraries(curl_libuv_example PRIVATE CURL::libcurl unofficial::libuv::libuv)
+target_include_directories(curl_libuv_example PRIVATE ${CMAKE_SOURCE_DIR})
 set_target_properties(curl_libuv_example PROPERTIES CXX_STANDARD 17)
