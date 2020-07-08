@@ -7,6 +7,7 @@
 #include <iomanip>
 #include <string_view>
 #include <array>
+#include <algorithm>
 
 constexpr const int NUM_REQUESTS = 10;
 
