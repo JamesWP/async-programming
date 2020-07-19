@@ -14,31 +14,13 @@ public:
     void unhandled_exception() { std::terminate(); }
   };
 
-  ~task()
-  {
-    if (_coro != nullptr)
-    {
-      std::cout << "Destroying task\n";
-      _coro.destroy();
-    }
-  }
-
-  task(task const &) = delete;
+  task(task const &) = delete; // Not implemented for brevity...
   task &operator=(task &&other) = delete;
-
-  task(task &&rhs)
-  {
-    std::cout << "Copied task\n";
-    _coro = rhs._coro;
-    rhs._coro = nullptr;
-  };
+  task(task &&rhs) = delete;
 
 private:
   handle _coro = nullptr;
-  task(handle coro) : _coro{coro}
-  {
-    std::cout << "Created task\n";
-  }
+  task(handle coro) : _coro{coro} { std::cout << "Created task\n"; }
 };
 
 std::coroutine_handle<> resume_handle;
