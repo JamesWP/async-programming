@@ -14,9 +14,7 @@ public:
       struct final_awaitable
       {
         bool await_ready() const noexcept { return false; }
-        handle await_suspend(handle coro) noexcept { 
-          return coro.promise()._continuation; 
-        }
+        auto await_suspend(handle coro) noexcept { std::cout << "Promise awaited\n"; return coro.promise()._continuation; }
         void await_resume() noexcept {}
       };
       return final_awaitable{}; 
@@ -24,7 +22,9 @@ public:
     auto get_return_object() noexcept { return task{handle::from_promise(*this)}; }
     void unhandled_exception() { std::terminate(); }
 
-    handle _continuation;
+    std::coroutine_handle<> _continuation;
+
+    promise_type(){std::cout << "Promise created\n";}
   };
     
   auto operator co_await() const &noexcept
@@ -51,8 +51,11 @@ public:
 
   task(task const &) = delete; // Not implemented for brevity...
   task &operator=(task &&other) = delete;
-  task(task &&rhs) = delete;
 
+  task(task&& rhs) : _coro(rhs._coro) { rhs._coro = nullptr; }
+  ~task(){ if(_coro) { _coro.destroy(); }}
+
+  promise_type& promise() const { return _coro.promise(); }
 private:
   handle _coro = nullptr;
   task(handle coro) : _coro{coro} { std::cout << "Created task\n"; }
@@ -70,9 +73,9 @@ struct pause : std::suspend_always
 
 task go()
 {
-  std::cout << "Go: enter\n";
+  std::cout << " Go: enter\n";
   co_await pause();
-  std::cout << "Go: exit\n";
+  std::cout << " Go: exit\n";
 }
 
 task other()
@@ -82,16 +85,10 @@ task other()
   std::cout << "Other: exit\n";
 }
 
-task other2()
-{
-  std::cout << "Other2: enter\n";
-  co_await other();
-  std::cout << "Other2: exit\n";
-}
-
 int main(int argc, char *argv[])
 {
-  auto g = other2();
+  auto g = other();
+  g.promise()._continuation = std::noop_coroutine();
 
   resume_handle();
 
