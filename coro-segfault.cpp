@@ -9,12 +9,12 @@ public:
   using handle = std::coroutine_handle<promise_type>;
   struct promise_type
   {
-    std::suspend_never initial_suspend() const noexcept { return {}; }
+    std::suspend_always initial_suspend() const noexcept { return {}; }
     auto final_suspend() const noexcept {
       struct final_awaitable
       {
         bool await_ready() const noexcept { return false; }
-        auto await_suspend(handle coro) noexcept { std::cout << "Promise awaited\n"; return coro.promise()._continuation; }
+        auto await_suspend(handle coro) noexcept { return coro.promise()._continuation; }
         void await_resume() noexcept {}
       };
       return final_awaitable{}; 
@@ -23,8 +23,6 @@ public:
     void unhandled_exception() { std::terminate(); }
 
     std::coroutine_handle<> _continuation;
-
-    promise_type(){std::cout << "Promise created\n";}
   };
     
   auto operator co_await() const &noexcept
@@ -49,16 +47,18 @@ public:
     return awaitable{_coro};
   }
 
-  task(task const &) = delete; // Not implemented for brevity...
-  task &operator=(task &&other) = delete;
-
+  task(task const &) = delete;
+  task &operator=(task &&other) = delete; // Not implemented for brevity...
   task(task&& rhs) : _coro(rhs._coro) { rhs._coro = nullptr; }
   ~task(){ if(_coro) { _coro.destroy(); }}
 
-  promise_type& promise() const { return _coro.promise(); }
+  void begin(std::coroutine_handle<> continuation = std::noop_coroutine()) {
+    _coro.promise()._continuation = continuation;
+    _coro();
+  }
 private:
   handle _coro = nullptr;
-  task(handle coro) : _coro{coro} { std::cout << "Created task\n"; }
+  task(handle coro) : _coro{coro} { }
 };
 
 std::coroutine_handle<> resume_handle;
@@ -88,7 +88,7 @@ task other()
 int main(int argc, char *argv[])
 {
   auto g = other();
-  g.promise()._continuation = std::noop_coroutine();
+  g.begin();
 
   resume_handle();
 
