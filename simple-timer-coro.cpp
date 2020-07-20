@@ -44,10 +44,16 @@ task go(uv_loop_t *loop)
   {
     co_await my_timer(loop, 1000);
 
-    std::cout << "Fire!\n";
+    std::cout << "go: Fire!\n";
   }
   
-  std::cout << "Finished firing\n";
+  std::cout << "go: Finished firing\n";
+}
+
+task go_top(uv_loop_t *loop) {
+  std::cout << "go_top: Starting\n";
+  co_await go(loop);
+  std::cout << "go_top: Done\n";
 }
 
 int main(int argc, char *argv[])
@@ -56,9 +62,9 @@ int main(int argc, char *argv[])
 
   uv_loop_t *loop = uv_default_loop();
 
-  auto handle = go(loop);
+  auto handle = go_top(loop);
 
-  //signal(SIGINT, [](int) -> void { running = false; });
+  signal(SIGINT, [](int) -> void { running = false; });
 
   int rc = uv_run(loop, UV_RUN_DEFAULT);
 
