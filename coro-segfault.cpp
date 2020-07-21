@@ -73,23 +73,32 @@ struct pause : std::suspend_always
 
 task go()
 {
-  std::cout << " Go: enter\n";
+  std::cout << "  Go: enter\n";
   co_await pause();
-  std::cout << " Go: exit\n";
+  std::cout << "  Go: exit\n";
 }
 
 task other()
 {
-  std::cout << "Other: enter\n";
+  std::cout << " Other: enter\n";
   co_await go();
-  std::cout << "Other: exit\n";
+  std::cout << " Other: exit\n";
+}
+
+task otherother()
+{
+  std::cout << "OtherOther: enter\n";
+  co_await other();
+  co_await other();
+  std::cout << "OtherOther: exit\n";
 }
 
 int main(int argc, char *argv[])
 {
-  auto g = other();
+  auto g = otherother();
   g.begin();
 
+  resume_handle();
   resume_handle();
 
   return 0;
