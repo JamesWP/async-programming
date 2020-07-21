@@ -1,23 +1,22 @@
 #include <iostream>
 #include <uv.h>
 
-uv_loop_t *loop;
-uv_timer_t timer;
-
 void on_timer_fire(uv_timer_t *timer)
 {
   std::cout << "Fire!\n";
+
+  uv_timer_start(timer, on_timer_fire, 1000, 0);
 }
 
 int main(int argc, char *argv[])
 {
   std::cout << "Simple timer demo\n";
 
-  loop = uv_default_loop();
+  uv_loop_t *loop = uv_default_loop();
+  static uv_timer_t timer;
+  uv_timer_init(loop, &timer);
 
-  uv_timer_init(loop, (uv_timer_t *)&timer);
-
-  uv_timer_start(&timer, on_timer_fire, 1000, 500);
+  uv_timer_start(&timer, on_timer_fire, 1000, 0);
 
   signal(SIGINT, [](int) -> void { uv_timer_stop(&timer); });
 

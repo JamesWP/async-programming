@@ -4,56 +4,36 @@
 
 #include "task.hpp"
 
-struct my_timer : std::suspend_always
+struct my_timer
 {
-  struct my_timer_handle
-  {
-    uv_timer_t timer;
-    std::coroutine_handle<> handle;
-  };
+  uv_timer_t *_timer{nullptr};
+  int _milliseconds{0};
+  bool _active = true;
 
-  my_timer(uv_loop_t *loop, int milliseconds) : _loop{loop}, _milliseconds{milliseconds} {}
-
-  void await_suspend(std::coroutine_handle<> handle)
+  bool await_ready() const noexcept { return false; }
+  void await_resume() const {}
+  void await_suspend(std::coroutine_handle<> handle) const noexcept
   {
-    my_timer_handle *timer_handle = new my_timer_handle();
-    timer_handle->handle = handle;
-    uv_timer_init(_loop, std::addressof(timer_handle->timer));
-    uv_timer_start(&timer_handle->timer, timer_cb, _milliseconds, 0);
+    this->_timer->data = (void *)handle.address();
+    uv_timer_start(this->_timer, timer_cb, _milliseconds, 0);
   }
-
   static void timer_cb(uv_timer_t *t)
   {
-    my_timer_handle *handle = (my_timer_handle *)t;
-    handle->handle();
-    delete handle;
+    std::coroutine_handle<>::from_address(t->data)();
   }
-
-private:
-  int _milliseconds{0};
-  uv_loop_t *_loop;
+  bool active() const { return _active; }
+  void cancel(){ _active = false; uv_timer_stop(_timer); timer_cb(_timer); }
 };
 
-bool running;
-
-task go(uv_loop_t *loop)
+task app(const my_timer& timer)
 {
-  running = true;
-
-  while (running)
+  while (timer.active())
   {
-    co_await my_timer(loop, 1000);
-
-    std::cout << "go: Fire!\n";
+    co_await timer;
+    std::cout << "Fire!\n";
   }
-  
-  std::cout << "go: Finished firing\n";
-}
 
-task go_top(uv_loop_t *loop) {
-  std::cout << "go_top: Starting\n";
-  co_await go(loop);
-  std::cout << "go_top: Done\n";
+  std::cout << "Finished firing\n";
 }
 
 int main(int argc, char *argv[])
@@ -61,14 +41,20 @@ int main(int argc, char *argv[])
   std::cout << "Simple timer demo\n";
 
   uv_loop_t *loop = uv_default_loop();
+  uv_timer_t timer;
 
-  auto handle = go_top(loop);
+  uv_timer_init(loop, &timer);
+  
+  static auto t = my_timer{&timer, 1000};
 
-  signal(SIGINT, [](int) -> void { running = false; });
+  auto handle = app(t);
+  handle.start();
+
+  signal(SIGINT, [](int) -> void { t.cancel(); });
 
   int rc = uv_run(loop, UV_RUN_DEFAULT);
 
-  std::cout << "\rExiting\n";
+  std::cout << "Exiting\n";
 
   return rc;
 }
