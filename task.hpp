@@ -2,6 +2,7 @@
 #define TASK
 
 #include <coroutine>
+#include <vector>
 
 class [[nodiscard]] task
 {
@@ -65,9 +66,14 @@ public:
 
   ~task(){ if(_coro) { _coro.destroy(); } }
 
+  static task await_all(const std::vector<task>& tasks);
+
 private:
   handle _coro = nullptr;
   task(promise_type& promise) : _coro{handle::from_promise(promise)} { }
 };
 
+// inline task task::await_all(const std::vector<task>& tasks){
+//   return {nullptr};
+// }
 #endif
