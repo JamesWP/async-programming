@@ -12,14 +12,14 @@ public:
   struct promise_type
   {
     std::suspend_always initial_suspend() const noexcept { return {}; }
-    auto final_suspend() const noexcept {    
+    auto final_suspend() const noexcept {
       struct final_awaitable
       {
         bool await_ready() const noexcept { return false; }
         auto await_suspend(handle coro) noexcept { return coro.promise()._continuation; }
         void await_resume() noexcept {}
       };
-      return final_awaitable{}; 
+      return final_awaitable{};
     }
 
     auto get_return_object() noexcept { return task{*this}; }
@@ -66,14 +66,15 @@ public:
 
   ~task(){ if(_coro) { _coro.destroy(); } }
 
-  static task await_all(const std::vector<task>& tasks);
+  static task all(const std::vector<task>& tasks);
 
 private:
   handle _coro = nullptr;
   task(promise_type& promise) : _coro{handle::from_promise(promise)} { }
 };
 
-// inline task task::await_all(const std::vector<task>& tasks){
-//   return {nullptr};
-// }
+task task::all(const std::vector<task>& tasks){
+  co_await std::suspend_always{};
+}
+
 #endif

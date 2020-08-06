@@ -1,18 +1,32 @@
 #include "curl_libuv.h"
 
 #include <cstdlib>
+#include <iostream>
+
+namespace {
 
 typedef struct curl_context_s {
   uv_poll_t poll_handle;
   curl_socket_t sockfd;
 } curl_context_t;
 
-namespace {
-    
+struct continuation_context {
+  using cb = std::function<void(const std::string&)>;
+
+  cb          callback;
+  std::string response;
+};
+
 uv_timer_t timeout;
 uv_loop_t *loop;
 CURLM *curl_handle;
-std::function<void(CURL*)> curl_done_cb;
+
+// The callback reads `count` elements of data, each `size` bytes long, from the stream pointed to by `ptr`, and processes them.
+size_t write_callback(char *ptr, size_t size, size_t count, void *userdata) {
+  std::string& response = *reinterpret_cast<std::string*>(userdata);
+  response.append(ptr, size * count);
+  return count;
+}
 
 void curl_close_cb(uv_handle_t *handle)
 {
@@ -65,7 +79,11 @@ void check_multi_info()
          curl_easy_cleanup." */
       easy_handle = message->easy_handle;
 
-      curl_done_cb(easy_handle);
+      continuation_context *ctx;
+      curl_easy_getinfo(easy_handle, CURLINFO_PRIVATE, &ctx);
+
+      ctx->callback(ctx->response);
+      delete ctx;
 
       curl_multi_remove_handle(curl_handle, easy_handle);
       curl_easy_cleanup(easy_handle);
@@ -148,24 +166,51 @@ int handle_socket(CURL *easy, curl_socket_t s, int action, void *userp,
 }
 } // annon namespace
 
-void curl_libuv_init(uv_loop_t *loop_p, std::function<void(CURL*)> curl_done) {
+void curl_libuv_init(uv_loop_t *loop_p) {
   if(curl_global_init(CURL_GLOBAL_ALL)) {
     fprintf(stderr, "Could not init curl\n");
     exit(1);
   }
+
   loop = loop_p;
 
-  uv_timer_init(loop, &timeout);
+  if(loop != nullptr){
+    uv_timer_init(loop, &timeout);
 
-  curl_handle = curl_multi_init();
-  curl_multi_setopt(curl_handle, CURLMOPT_SOCKETFUNCTION, handle_socket);
-  curl_multi_setopt(curl_handle, CURLMOPT_TIMERFUNCTION, start_timeout);
-
-  curl_done_cb = curl_done;
+    curl_handle = curl_multi_init();
+    curl_multi_setopt(curl_handle, CURLMOPT_SOCKETFUNCTION, handle_socket);
+    curl_multi_setopt(curl_handle, CURLMOPT_TIMERFUNCTION, start_timeout);
+  }
 }
 
-void curl_libuv_add(CURL *handle) {
+void curl_libuv_async(CURL *handle, std::function<void(const std::string&)> callback) {
+  continuation_context *ctx = new continuation_context();
+
+  curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, &ctx->response);
+  curl_easy_setopt(handle, CURLOPT_PRIVATE, ctx);
+
+  ctx->callback = callback;
+
   curl_multi_add_handle(curl_handle, handle);
+}
+
+std::string curl_libuv_sync(CURL* handle) {
+  std::string response;
+
+  curl_easy_setopt(handle, CURLOPT_FOLLOWLOCATION, 1L);
+  curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, write_callback);
+  curl_easy_setopt(handle, CURLOPT_WRITEDATA, &response);
+
+  CURLcode res = curl_easy_perform(handle);
+
+  if(res != CURLE_OK) {
+      std::cerr << "curl_easy_perform() failed:" << curl_easy_strerror(res) << "\n";
+      exit(1);
+  }
+
+  return response;
 }
 
 void curl_libuv_cleanup() {
