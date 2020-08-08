@@ -66,15 +66,10 @@ public:
 
   ~task(){ if(_coro) { _coro.destroy(); } }
 
-  static task all(const std::vector<task>& tasks);
-
 private:
   handle _coro = nullptr;
-  task(promise_type& promise) : _coro{handle::from_promise(promise)} { }
+  task(promise_type& promise) : _coro{handle::from_promise(promise)} {
+  }
 };
-
-task task::all(const std::vector<task>& tasks){
-  co_await std::suspend_always{};
-}
 
 #endif

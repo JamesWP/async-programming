@@ -13,8 +13,6 @@
 
 #include "curl_libuv.h"
 
-constexpr const int NUM_REQUESTS = 100;
-
 void async_download(const char *url);
 
 int main(int argc, char **argv)

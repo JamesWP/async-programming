@@ -3,8 +3,7 @@
 #include <iomanip>
 #include "curl_libuv.h"
 #include "task.hpp"
-
-constexpr const int NUM_REQUESTS = 100;
+#include "when_all_task.hpp"
 
 struct curl_download {
   std::string_view _url;
@@ -36,6 +35,7 @@ int main(int argc, char* argv[]) {
   std::string url = argc < 2 ? "https://example.com": argv[1];
 
   auto app = application(url);
+  app.start();
 
   uv_run(loop, UV_RUN_DEFAULT);
 
@@ -50,22 +50,20 @@ size_t count_lines(std::string_view data) {
 }
 
 task coro_download(std::string_view url) {
-  std::cout << "About to start download\n";
   auto content = co_await curl_download(url);
 
-  std::cout << "Finished download\n";
-  std::cout << count_lines(content) << "\n";
+  std::cout << "Response lines: " << count_lines(content) << "\n";
 }
 
 task application(std::string_view url){
   std::vector<task> tasks;
 
-  std::cout<<"initial loop\n";
   for(int i = 0; i < NUM_REQUESTS; i++) {
     tasks.emplace_back(coro_download(url));
   }
 
-  co_await task::all(tasks);
+  co_await when_all_ready(std::move(tasks));
+
 }
 
 

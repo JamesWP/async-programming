@@ -8,8 +8,6 @@
 
 #include "curl_libuv.h"
 
-constexpr const int NUM_REQUESTS = 10;
-
 // Perform HTTP get syncronously
 void single_thread(std::string_view url);
 
